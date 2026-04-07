@@ -24,9 +24,9 @@ model user {
   // Relations
   accounts      account[]
   sessions      session[]
-  projects      project[]
-  animationJobs animationJob[]
-  donations     donation[]
+  // projects      project[]
+  // animationJobs animationJob[]
+  // donations     donation[]
 }
 
 model account {

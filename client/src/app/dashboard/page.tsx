@@ -146,6 +146,10 @@ export default function DashboardPage() {
 
       {/* Main panel */}
       <div className="flex flex-col flex-1 overflow-hidden w-full relative z-10">
+        <div className="p-4 flex items-center mb-2">
+          <h2 className="text-xl font-medium text-white">Hey {user.name || 'User'}, welcome to Recora</h2>
+        </div>
+
         {/* Error Alert */}
         {error && (
           <div className="flex-shrink-0 bg-red-500/10 border border-red-500/20 px-4 py-3 m-4 rounded-lg flex items-start gap-3">
