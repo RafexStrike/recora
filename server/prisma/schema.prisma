@@ -83,6 +83,7 @@ model verification {
 model studio {
   id        String   @id @default(cuid())
   name      String
+  slug      String   @unique @default(cuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -103,6 +104,8 @@ model recording_track {
   id                 String   @id @default(cuid())
   recordingSessionId String
   userId             String?
+  participantId      String?  // LiveKit participant identity
+  displayName        String?  // Display name (for guest participants)
   type               String   @default("video") // e.g. "video", "audio", "screen"
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt

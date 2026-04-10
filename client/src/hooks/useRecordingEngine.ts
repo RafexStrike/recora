@@ -8,10 +8,21 @@ interface UseRecordingEngineProps {
 export function useRecordingEngine({ trackId }: UseRecordingEngineProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [hasPendingChunks, setHasPendingChunks] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunkIndexRef = useRef(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const uploadLoopRef = useRef<boolean>(false);
+
+  // Check pending chunks status
+  const checkPendingChunks = useCallback(async () => {
+    const count = await localDb.chunks
+      .where('status')
+      .equals('pending')
+      .filter(chunk => chunk.trackId === trackId)
+      .count();
+    setHasPendingChunks(count > 0);
+  }, [trackId]);
 
   // Background Uploader logic
   const uploadPendingChunks = useCallback(async () => {
@@ -38,10 +49,6 @@ export function useRecordingEngine({ trackId }: UseRecordingEngineProps) {
         formData.append('chunkIndex', pendingChunk.chunkIndex.toString());
         formData.append('blob', pendingChunk.blob, `chunk_${pendingChunk.chunkIndex}.webm`);
 
-        // We use the full API URL just in case, but relative usually works if next.js rewrites.
-        // Assuming Next.js runs on 3000 and the backend might run on another port, typically 5000. 
-        // We'll use relative and let CORS/Next middleware handle it, or hardcode environment var 
-        // For MVP, we'll hit http://localhost:5000/api/recording/upload-chunk 
         const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
         const response = await fetch(`${backendUrl}/api/recording/upload-chunk`, {
@@ -62,8 +69,9 @@ export function useRecordingEngine({ trackId }: UseRecordingEngineProps) {
       console.warn(`[Uploader] Upload network error: ${err.message}. Will retry.`);
     } finally {
       uploadLoopRef.current = false;
+      await checkPendingChunks();
     }
-  }, [trackId]);
+  }, [trackId, checkPendingChunks]);
 
   // Uploader Polling interval (acts as background worker)
   useEffect(() => {
@@ -97,6 +105,7 @@ export function useRecordingEngine({ trackId }: UseRecordingEngineProps) {
           createdAt: Date.now(),
         });
         console.log(`[LocalStore] Chunk #${index} saved to IndexedDB.`);
+        setHasPendingChunks(true);
       }
     };
 
@@ -128,6 +137,7 @@ export function useRecordingEngine({ trackId }: UseRecordingEngineProps) {
   return {
     isRecording,
     recordingTime,
+    hasPendingChunks,
     startRecording,
     stopRecording,
   };

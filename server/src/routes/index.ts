@@ -8,6 +8,7 @@ import adminRouter from '../module/admin/admin.route';
 import aiRouter from '../module/ai/ai.route';
 import paymentRouter from '../module/payment/payment.route';
 import recordingRouter from '../module/recording/recording.route';
+import livekitRouter from '../module/livekit/livekit.route';
 
 const routes = Router();
 
@@ -20,6 +21,7 @@ routes.use('/admin', adminRouter);
 routes.use('/ai', aiRouter);
 routes.use('/payment', paymentRouter);
 routes.use('/recording', recordingRouter);
+routes.use('/rooms', livekitRouter);
 
 // Health check endpoint
 routes.get('/health', (_req, res) => {

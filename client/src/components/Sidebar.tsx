@@ -27,7 +27,7 @@ export function Sidebar() {
 
   const navLinks = [
     { name: "Home", href: "/dashboard", icon: <Home className="w-5 h-5" /> },
-    { name: "Studio", href: "/dashboard/team-view", icon: <Video className="w-5 h-5" /> },
+    { name: "Studio", href: "/studio/default-studio", icon: <Video className="w-5 h-5" /> },
     { name: "Projects", href: "/dashboard/projects", icon: <FolderOpen className="w-5 h-5" /> },
   ];
 
