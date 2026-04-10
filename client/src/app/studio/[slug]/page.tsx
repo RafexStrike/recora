@@ -6,6 +6,7 @@ import {
   Room,
   RoomEvent,
   RemoteParticipant,
+  ParticipantEvent,
   Track,
 } from 'livekit-client';
 import '@livekit/components-styles';
@@ -14,6 +15,64 @@ import { useSyncedRecording } from '../../../hooks/useSyncedRecording';
 import { VideoTile } from '../../../components/studio/VideoTile';
 import { GreenRoomModal } from '../../../components/studio/GreenRoomModal';
 import { Mic, MicOff, Video, VideoOff, Link2, Loader2 } from 'lucide-react';
+
+// Wrapper to robustly attach tracks for remote participants
+function RemoteVideoTile({ participant, isRecording }: { participant: RemoteParticipant; isRecording: boolean }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (!videoRef.current) return;
+    const el = videoRef.current;
+
+    const attach = (track: Track) => {
+      if (track.kind === Track.Kind.Video) {
+        track.attach(el);
+      }
+    };
+
+    // 1. If already subscribed when component mounts, attach
+    participant.videoTrackPublications.forEach((pub) => {
+      if (pub.isSubscribed && pub.track) attach(pub.track);
+    });
+
+    // 2. Listen for future track subscriptions on this participant
+    const onSubscribed = (track: Track) => attach(track);
+    participant.on(ParticipantEvent.TrackSubscribed, onSubscribed);
+
+    return () => {
+      participant.off(ParticipantEvent.TrackSubscribed, onSubscribed);
+      participant.videoTrackPublications.forEach((pub) => {
+        if (pub.track) pub.track.detach(el);
+      });
+    };
+  }, [participant]);
+
+  return (
+    <div className="relative w-full aspect-video bg-[#0a0a0a] rounded-2xl overflow-hidden border border-white/10 shadow-xl">
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        className="w-full h-full object-cover"
+      />
+
+      {/* REC badge for remote */}
+      {isRecording && (
+        <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 bg-red-500/90 backdrop-blur-sm text-white text-xs font-bold px-3 py-1 rounded-full">
+          <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+          REC
+        </div>
+      )}
+
+      {/* Name label */}
+      <div className="absolute bottom-0 left-0 right-0 px-4 py-3 bg-gradient-to-t from-black/80 to-transparent">
+        <span className="text-sm font-medium text-white">
+          {participant.name || participant.identity}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 export default function StudioRoomPage() {
   const params = useParams();
@@ -26,7 +85,6 @@ export default function StudioRoomPage() {
 
   // Video refs
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
 
   // Participant state
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
@@ -98,23 +156,21 @@ export default function StudioRoomPage() {
       setRemoteParticipants(prev => prev.filter(p => p.identity !== participant.identity));
     });
 
-    livekitRoom.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
-      if (track.kind === Track.Kind.Video) {
-        const videoEl = remoteVideoRefs.current.get(participant.identity);
-        if (videoEl) track.attach(videoEl);
-      }
-    });
-
-    livekitRoom.on(RoomEvent.TrackUnsubscribed, (track) => {
-      track.detach();
-    });
-
     livekitRoom.on(RoomEvent.Disconnected, () => {
       setIsConnected(false);
       console.log('[LiveKit] Disconnected from room');
     });
 
     await livekitRoom.connect(url, token);
+
+    // Add any existing participants (e.g. host already in room when guest joins)
+    const existing = Array.from(livekitRoom.remoteParticipants.values());
+    if (existing.length > 0) {
+      setRemoteParticipants(prev => {
+        const fresh = existing.filter((ex) => !prev.some(p => p.identity === ex.identity));
+        return [...prev, ...fresh];
+      });
+    }
 
     // Publish tracks to LiveKit for live preview (uses original stream)
     const audioTrack = stream.getAudioTracks()[0];
@@ -190,12 +246,6 @@ export default function StudioRoomPage() {
 
   const formatTime = (s: number) => new Date(s * 1000).toISOString().substring(11, 19);
 
-  // Assign a video ref for a remote participant
-  const getRemoteVideoRef = (identity: string) => (el: HTMLVideoElement | null) => {
-    if (el) remoteVideoRefs.current.set(identity, el);
-    else remoteVideoRefs.current.delete(identity);
-  };
-
   return (
     <div className="min-h-screen bg-[#030303] flex flex-col">
 
@@ -267,32 +317,11 @@ export default function StudioRoomPage() {
 
           {/* Remote participant tiles */}
           {remoteParticipants.map((participant) => (
-            <div
+            <RemoteVideoTile
               key={participant.identity}
-              className="relative w-full aspect-video bg-[#0a0a0a] rounded-2xl overflow-hidden border border-white/10 shadow-xl"
-            >
-              <video
-                ref={getRemoteVideoRef(participant.identity)}
-                autoPlay
-                playsInline
-                className="w-full h-full object-cover"
-              />
-
-              {/* REC badge for remote */}
-              {isRecording && (
-                <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 bg-red-500/90 backdrop-blur-sm text-white text-xs font-bold px-3 py-1 rounded-full">
-                  <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                  REC
-                </div>
-              )}
-
-              {/* Name label */}
-              <div className="absolute bottom-0 left-0 right-0 px-4 py-3 bg-gradient-to-t from-black/80 to-transparent">
-                <span className="text-sm font-medium text-white">
-                  {participant.name || participant.identity}
-                </span>
-              </div>
-            </div>
+              participant={participant}
+              isRecording={isRecording}
+            />
           ))}
 
           {/* Waiting placeholder tile */}
