@@ -7,8 +7,6 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import BackgroundShader from "@/components/BackgroundShader";
 import Image from "next/image";
-import MathematicalAnimationsPreview from "@/components/MathematicalAnimationsPreview";
-import FeatureShowcase from "@/components/FeatureShowcase";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
 /**
@@ -139,13 +137,6 @@ export default function LandingPage() {
     }}
   />
 </section>
-
-        {/* Mathematical Animations Preview */}
-        <MathematicalAnimationsPreview />
-
-        {/* Feature Showcase */}
-        <FeatureShowcase />
-
 
 
 {/* CTA Section */}

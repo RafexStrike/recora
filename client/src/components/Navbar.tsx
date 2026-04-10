@@ -5,7 +5,6 @@ import { useAuth } from "./AuthProvider";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import DonationModal from "./DonationModal";
 import Image from "next/image";
 
 /**
@@ -16,7 +15,8 @@ import Image from "next/image";
 export default function Navbar() {
   const { user, logout, loading } = useAuth();
   const pathname = usePathname();
-  const [donationModalOpen, setDonationModalOpen] = useState(false);
+
+  if (pathname.startsWith('/dashboard')) return null;
 
   const navLinks: { name: string, href: string }[] = [
     { name: "Dashboard", href: "/dashboard" },
@@ -69,12 +69,6 @@ export default function Navbar() {
             {!loading && (
               user ? (
                 <>
-                  <button
-                    onClick={() => setDonationModalOpen(true)}
-                    className="hidden sm:inline-flex items-center justify-center px-5 py-2.5 rounded-full bg-gradient-to-r from-primary to-secondary text-white text-xs sm:text-sm font-semibold hover:shadow-[0_0_20px_rgba(124,58,237,0.3)] transition-all hover:scale-105 active:scale-95"
-                  >
-                    Donate
-                  </button>
                   <div className="flex items-center gap-3 pl-2 border-l border-white/10 ml-2">
                     <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[10px] sm:text-xs font-bold text-gray-400 hover:border-primary/50 transition-colors cursor-pointer overflow-hidden">
                       {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
@@ -105,8 +99,6 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* Donation Modal */}
-      <DonationModal open={donationModalOpen} onOpenChange={setDonationModalOpen} />
     </>
   );
 }
