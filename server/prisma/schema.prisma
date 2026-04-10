@@ -12,18 +12,18 @@ datasource db {
 
 // Better Auth Models - Required for authentication
 model user {
-  id            String          @id @default(cuid())
+  id            String   @id @default(cuid())
   name          String?
-  email         String          @unique
-  emailVerified Boolean         @default(false)
+  email         String   @unique
+  emailVerified Boolean  @default(false)
   image         String?
-  role          String          @default("USER")
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  
+  role          String   @default("USER")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
   // Relations
-  accounts      account[]
-  sessions      session[]
+  accounts account[]
+  sessions session[]
   // projects      project[]
   // animationJobs animationJob[]
   // donations     donation[]
@@ -48,25 +48,25 @@ model account {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  user              user     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user user @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([providerId, providerAccountId])
   @@index([userId])
 }
 
 model session {
-  id            String   @id @default(cuid())
-  expiresAt     DateTime
-  token         String   @unique
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  ipAddress     String?
-  userAgent     String?
-  userId        String
-  
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+
   // Relations
-  user          user   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  user user @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
 }
 
@@ -76,8 +76,49 @@ model verification {
   token      String   @unique
   expires    DateTime
   createdAt  DateTime @default(now())
-  
+
   @@unique([identifier, token])
 }
 
+model studio {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  recording_sessions recording_session[]
+}
+
+model recording_session {
+  id        String   @id @default(cuid())
+  studioId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  studio studio            @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  tracks recording_track[]
+}
+
+model recording_track {
+  id                 String   @id @default(cuid())
+  recordingSessionId String
+  userId             String?
+  type               String   @default("video") // e.g. "video", "audio", "screen"
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  recording_session recording_session @relation(fields: [recordingSessionId], references: [id], onDelete: Cascade)
+  chunks            upload_chunk[]
+}
+
+model upload_chunk {
+  id         String   @id @default(cuid())
+  trackId    String
+  chunkIndex Int
+  blobUrl    String
+  createdAt  DateTime @default(now())
+
+  track recording_track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([trackId, chunkIndex])
+}

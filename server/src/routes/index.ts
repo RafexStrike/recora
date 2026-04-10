@@ -7,6 +7,7 @@ import animationRouter from '../module/animation/animation.route';
 import adminRouter from '../module/admin/admin.route';
 import aiRouter from '../module/ai/ai.route';
 import paymentRouter from '../module/payment/payment.route';
+import recordingRouter from '../module/recording/recording.route';
 
 const routes = Router();
 
@@ -18,6 +19,7 @@ routes.use('/animations', animationRouter);
 routes.use('/admin', adminRouter);
 routes.use('/ai', aiRouter);
 routes.use('/payment', paymentRouter);
+routes.use('/recording', recordingRouter);
 
 // Health check endpoint
 routes.get('/health', (_req, res) => {

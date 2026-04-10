@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Video, VideoOff, Mic, MicOff } from "lucide-react";
+import { useRecordingEngine } from "../../../hooks/useRecordingEngine";
 
 export default function TeamViewPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -9,6 +10,9 @@ export default function TeamViewPage() {
   const [error, setError] = useState<string | null>(null);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
+
+  const trackId = "track-demo-123";
+  const { isRecording, recordingTime, startRecording, stopRecording } = useRecordingEngine({ trackId });
 
   useEffect(() => {
     let activeStream: MediaStream | null = null;
@@ -76,6 +80,14 @@ export default function TeamViewPage() {
             />
           )}
 
+          {/* Timer Overlay */}
+          {isRecording && (
+            <div className="absolute top-4 right-4 bg-red-500/80 backdrop-blur text-white px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2">
+               <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+               {new Date(recordingTime * 1000).toISOString().substring(11, 19)}
+            </div>
+          )}
+
           {!isVideoEnabled && !error && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center">
@@ -105,6 +117,21 @@ export default function TeamViewPage() {
               }`}
             >
               {isVideoEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+            </button>
+            
+            <button
+              disabled={!stream}
+              onClick={() => {
+                if (isRecording) stopRecording();
+                else if (stream) startRecording(stream);
+              }}
+              className={`px-6 py-3 ml-4 rounded-full font-semibold transition-all ${
+                isRecording 
+                  ? 'bg-red-500 hover:bg-red-600 border border-red-400 text-white shadow-[0_0_15px_rgba(239,68,68,0.5)]' 
+                  : 'bg-[#00f0ff]/20 hover:bg-[#00f0ff]/30 text-[#00f0ff] border border-[#00f0ff]/50 shadow-[0_0_15px_rgba(0,240,255,0.2)] disabled:opacity-50'
+              }`}
+            >
+              {isRecording ? 'Stop Recording' : 'Start Recording'}
             </button>
           </div>
         </div>
