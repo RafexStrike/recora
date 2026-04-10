@@ -64,7 +64,7 @@ export default function TeamViewPage() {
 
   return (
     <div className="max-w-5xl mx-auto h-full flex flex-col pt-4">
-      <h1 className="text-3xl font-bold tracking-tight mb-8 text-white">Team View</h1>
+      <h1 className="text-3xl font-bold tracking-tight mb-8 text-white">Studio</h1>
       
       <div className="flex-1 flex flex-col items-center justify-center max-h-[70vh]">
         <div className="w-full max-w-3xl aspect-video bg-black rounded-2xl overflow-hidden border border-white/10 relative shadow-2xl flex items-center justify-center">
@@ -139,7 +139,7 @@ export default function TeamViewPage() {
         <div className="mt-8 text-center max-w-xl">
           <h2 className="text-xl font-semibold text-white mb-2">Ready to join?</h2>
           <p className="text-gray-400 text-sm">
-            Check your audio and video settings before joining the team view session.
+            Check your audio and video settings before joining the Studio session.
             All processing is handled directly in your browser.
           </p>
         </div>

@@ -27,8 +27,8 @@ export function Sidebar() {
 
   const navLinks = [
     { name: "Home", href: "/dashboard", icon: <Home className="w-5 h-5" /> },
+    { name: "Studio", href: "/dashboard/team-view", icon: <Video className="w-5 h-5" /> },
     { name: "Projects", href: "/dashboard/projects", icon: <FolderOpen className="w-5 h-5" /> },
-    { name: "Team View", href: "/dashboard/team-view", icon: <Video className="w-5 h-5" /> },
   ];
 
   return (
@@ -88,7 +88,7 @@ export function Sidebar() {
       <div className="p-3 border-t border-white/10 relative">
         {isProfileMenuOpen && (
           <div className="absolute bottom-full left-3 right-3 mb-2 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl overflow-hidden py-1 z-50">
-             <button
+            <button
               onClick={() => {
                 setIsProfileMenuOpen(false);
                 logout();
