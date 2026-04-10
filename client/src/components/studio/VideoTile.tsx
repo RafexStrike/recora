@@ -1,12 +1,13 @@
 // File: client/src/components/studio/VideoTile.tsx
 'use client';
 
-import { RefObject } from 'react';
+import { RefObject, useEffect } from 'react';
 import { VideoOff } from 'lucide-react';
 import { CountdownOverlay } from './CountdownOverlay';
 
 interface VideoTileProps {
   videoRef?: RefObject<HTMLVideoElement | null>;
+  stream?: MediaStream | null;
   name: string;
   isHost?: boolean;
   isRecording: boolean;
@@ -18,6 +19,7 @@ interface VideoTileProps {
 
 export function VideoTile({
   videoRef,
+  stream,
   name,
   isHost = false,
   isRecording,
@@ -26,6 +28,16 @@ export function VideoTile({
   countdown = null,
   muted = false,
 }: VideoTileProps) {
+  
+  // Re-attach stream robustly in case React remounts the video element
+  useEffect(() => {
+    if (videoRef && videoRef.current && stream) {
+      if (videoRef.current.srcObject !== stream) {
+        videoRef.current.srcObject = stream;
+      }
+    }
+  }, [stream, videoRef]);
+
   return (
     <div className="relative w-full aspect-video bg-[#0a0a0a] rounded-2xl overflow-hidden border border-white/10 shadow-xl">
       <video

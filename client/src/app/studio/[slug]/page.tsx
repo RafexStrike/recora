@@ -306,6 +306,7 @@ export default function StudioRoomPage() {
           {/* Local (self) tile */}
           <VideoTile
             videoRef={localVideoRef}
+            stream={localStream}
             name={localName || 'You'}
             isHost={isAdmin}
             isRecording={isRecording}
