@@ -22,9 +22,6 @@ export default function Navbar() {
     { name: "Dashboard", href: "/dashboard" },
   ];
 
-  if (user?.role === "ADMIN") {
-    navLinks.push({ name: "Admin Panel", href: "/admin" });
-  }
 
   return (
     <>

@@ -2,11 +2,6 @@
 import { Router } from 'express';
 import userRouter from '../module/user/user.route';
 import authRouter from '../module/auth/auth.route';
-import projectRouter from '../module/project/project.route';
-import animationRouter from '../module/animation/animation.route';
-import adminRouter from '../module/admin/admin.route';
-import aiRouter from '../module/ai/ai.route';
-import paymentRouter from '../module/payment/payment.route';
 import recordingRouter from '../module/recording/recording.route';
 import livekitRouter from '../module/livekit/livekit.route';
 
@@ -15,11 +10,6 @@ const routes = Router();
 // Module Routes
 routes.use('/users', userRouter);
 routes.use('/auth', authRouter);
-routes.use('/projects', projectRouter);
-routes.use('/animations', animationRouter);
-routes.use('/admin', adminRouter);
-routes.use('/ai', aiRouter);
-routes.use('/payment', paymentRouter);
 routes.use('/recording', recordingRouter);
 routes.use('/rooms', livekitRouter);
 
