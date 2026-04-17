@@ -41,61 +41,37 @@ export function VideoTile({
   useLayoutEffect(() => {
     const video = videoRef?.current;
     if (!video || !stream) {
-      if (!video) console.warn('[VideoTile] useLayoutEffect: Video element not ready', { name, isSelf });
+      if (video && !stream) {
+        video.srcObject = null;
+      }
       return;
     }
     
-    // Verify video element is actually in the DOM
-    if (!document.body.contains(video)) {
-      console.warn('[VideoTile] useLayoutEffect: Video element not in DOM yet', { name, isSelf });
-      return;
-    }
-    
-    // Attach stream synchronously before browser paint
     if (video.srcObject !== stream) {
-      console.log('[VideoTile] useLayoutEffect: Attaching stream synchronously', { 
+      console.log('[VideoTile] Attaching stream to video element', { 
         name, 
         isSelf,
-        videoElement: !!video,
-        videoElementInDOM: document.body.contains(video),
-        streamReady: !!stream && stream.getVideoTracks().length > 0,
+        streamTracks: stream.getVideoTracks().length,
       });
       video.srcObject = stream;
     }
-  }, [stream, videoRef, name, isSelf]);
-  
-  // Re-attach stream robustly in case React remounts the video element
+  }, [stream, videoRef]);
+
+  // Log stream status periodically for debugging
   useEffect(() => {
-    if (!videoRef?.current) {
-      console.log('[VideoTile] videoRef.current not available yet', { name, isSelf });
-      return;
-    }
-    
-    if (!stream) {
-      console.log('[VideoTile] Stream is null, clearing srcObject', { name, isSelf });
-      videoRef.current.srcObject = null;
-      return;
-    }
-    
-    console.log('[VideoTile] Attempting to attach stream', {
-      name,
-      isSelf,
-      currentSrcObject: !!videoRef.current.srcObject,
-      incomingStream: !!stream,
-      videoTracks: stream.getVideoTracks().length,
-      audioTracks: stream.getAudioTracks().length,
-    });
-    
-    // Always set srcObject, even if it's the same stream
-    // This ensures attachment after React re-renders
-    videoRef.current.srcObject = stream;
-    
-    console.log('[VideoTile] Stream attachment completed', {
-      name,
-      isSelf,
-      srcObjectNow: !!videoRef.current.srcObject,
-      isCorrectStream: videoRef.current.srcObject === stream,
-    });
+    const interval = setInterval(() => {
+      if (videoRef?.current && stream) {
+        const videoTrack = stream.getVideoTracks()[0];
+        console.log('[VideoTile Debug] Stream Status:', {
+          name,
+          isSelf,
+          srcObjectSet: !!videoRef.current.srcObject,
+          trackReady: videoTrack?.readyState === 'live',
+          trackEnabled: videoTrack?.enabled,
+        });
+      }
+    }, 5000);
+    return () => clearInterval(interval);
   }, [stream, videoRef, name, isSelf]);
 
   return (

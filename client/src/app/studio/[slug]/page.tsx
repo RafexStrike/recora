@@ -85,6 +85,7 @@ export default function StudioRoomPage() {
 
   // Video refs
   const localVideoRef = useRef<HTMLVideoElement>(null);
+  const streamsRef = useRef<{ local?: MediaStream; recording?: MediaStream }>({});
 
   // Participant state
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
@@ -179,11 +180,13 @@ export default function StudioRoomPage() {
       
       // Just set state — VideoTile will attach when ready
       setLocalStream(stream);
+      streamsRef.current.local = stream;
 
       // High-quality recording stream — independent clone so network degradation
       // on the LiveKit stream never affects local recording quality
       const cloned = stream.clone();
       setRecordingStream(cloned);
+      streamsRef.current.recording = cloned;
       console.log('[Setup] Recording stream cloned successfully');
 
       return stream;
@@ -298,8 +301,8 @@ export default function StudioRoomPage() {
 
     return () => {
       room?.disconnect();
-      localStream?.getTracks().forEach(t => t.stop());
-      recordingStream?.getTracks().forEach(t => t.stop());
+      streamsRef.current.local?.getTracks().forEach(t => t.stop());
+      streamsRef.current.recording?.getTracks().forEach(t => t.stop());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
