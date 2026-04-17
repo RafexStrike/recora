@@ -14,14 +14,14 @@ export const SYNC_MESSAGES = {
 interface UseSyncedRecordingProps {
   trackId: string;
   room: Room | null;
-  isAdmin: boolean;
+  isHost: boolean;
   recordingStream: MediaStream | null;
 }
 
 export function useSyncedRecording({
   trackId,
   room,
-  isAdmin,
+  isHost,
   recordingStream,
 }: UseSyncedRecordingProps) {
   const { isRecording, recordingTime, startRecording, stopRecording, hasPendingChunks } =
@@ -88,7 +88,7 @@ export function useSyncedRecording({
 
   // HOST ONLY: broadcast start to all participants (including self)
   const broadcastStart = useCallback(async () => {
-    if (!room || !isAdmin) return;
+    if (!room || !isHost) return;
 
     const msg = JSON.stringify({ type: SYNC_MESSAGES.START_RECORDING });
     const encoded = new TextEncoder().encode(msg);
@@ -97,11 +97,11 @@ export function useSyncedRecording({
     // Also trigger on host side
     console.log('[Sync] Host broadcasting START_RECORDING');
     beginCountdownAndRecord();
-  }, [room, isAdmin, beginCountdownAndRecord]);
+  }, [room, isHost, beginCountdownAndRecord]);
 
   // HOST ONLY: broadcast stop
   const broadcastStop = useCallback(async () => {
-    if (!room || !isAdmin) return;
+    if (!room || !isHost) return;
 
     const msg = JSON.stringify({ type: SYNC_MESSAGES.STOP_RECORDING });
     const encoded = new TextEncoder().encode(msg);
@@ -109,7 +109,7 @@ export function useSyncedRecording({
 
     console.log('[Sync] Host broadcasting STOP_RECORDING');
     stopRecording();
-  }, [room, isAdmin, stopRecording]);
+  }, [room, isHost, stopRecording]);
 
   return {
     isRecording,

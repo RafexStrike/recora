@@ -89,7 +89,8 @@ export default function StudioRoomPage() {
   // Participant state
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
   const [localName, setLocalName] = useState('');
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isHost, setIsHost] = useState(false);
+  const [roomStatus, setRoomStatus] = useState<'WAITING' | 'LIVE' | 'ENDED'>('WAITING');
   const [isConnected, setIsConnected] = useState(false);
 
   // Media state
@@ -114,35 +115,94 @@ export default function StudioRoomPage() {
     useSyncedRecording({
       trackId,
       room,
-      isAdmin,
+      isHost,
       recordingStream,
     });
 
+  // Debug: monitor video ref and stream attachment
+  useEffect(() => {
+    console.log('[DEBUG] Video render state:', {
+      localVideoRef: !!localVideoRef.current,
+      srcObject: !!localVideoRef.current?.srcObject,
+      srcObjectIsStream: localVideoRef.current?.srcObject instanceof MediaStream,
+      isCamEnabled,
+      localStreamExists: !!localStream,
+      videoTrackCount: localStream?.getVideoTracks().length ?? 0,
+      videoTrackEnabled: localStream?.getVideoTracks()[0]?.enabled,
+    });
+  }, [localStream, isCamEnabled]);
+
+  // Start the session (Host only)
+  const startSession = useCallback(async () => {
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${backendUrl}/api/rooms/${slug}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Failed to start session');
+      }
+
+      setRoomStatus('LIVE');
+      console.log('[Session] Room started successfully');
+    } catch (err: any) {
+      console.error('[Session] Failed to start room:', err.message);
+      setConnectError(err.message);
+    }
+  }, [slug]);
+
+  const handleStartRecording = useCallback(async () => {
+    if (roomStatus === 'WAITING') {
+      await startSession();
+    }
+    broadcastStart();
+  }, [roomStatus, startSession, broadcastStart]);
+
   // Setup local camera/mic stream and clone it for recording
   const setupLocalMedia = useCallback(async (): Promise<MediaStream> => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
-      audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
-    });
-    setLocalStream(stream);
+    try {
+      console.log('[Setup] Starting getUserMedia...');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
+      });
+      
+      console.log('[Setup] getUserMedia success:', {
+        videoTracks: stream.getVideoTracks().length,
+        audioTracks: stream.getAudioTracks().length,
+        videoTrackId: stream.getVideoTracks()[0]?.id,
+      });
+      
+      // Just set state — VideoTile will attach when ready
+      setLocalStream(stream);
 
-    // High-quality recording stream — independent clone so network degradation
-    // on the LiveKit stream never affects local recording quality
-    const cloned = stream.clone();
-    setRecordingStream(cloned);
+      // High-quality recording stream — independent clone so network degradation
+      // on the LiveKit stream never affects local recording quality
+      const cloned = stream.clone();
+      setRecordingStream(cloned);
+      console.log('[Setup] Recording stream cloned successfully');
 
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = stream;
+      return stream;
+    } catch (err: any) {
+      console.error('[Setup] getUserMedia failed:', err.message);
+      throw err;
     }
-    return stream;
   }, []);
 
   // Connect to LiveKit room and publish local tracks
   const connectToRoom = useCallback(async (token: string, url: string, stream: MediaStream): Promise<Room> => {
+    console.log('[LiveKit] Creating room instance...');
     const livekitRoom = new Room({ adaptiveStream: true, dynacast: true });
 
     livekitRoom.on(RoomEvent.Connected, () => {
       console.log(`[LiveKit] Connected to room "${slug}"`);
+      console.log('[LiveKit] Local participant video tracks:', {
+        count: livekitRoom.localParticipant.videoTrackPublications.size,
+      });
       setIsConnected(true);
     });
 
@@ -161,11 +221,14 @@ export default function StudioRoomPage() {
       console.log('[LiveKit] Disconnected from room');
     });
 
+    console.log('[LiveKit] Connecting to room...');
     await livekitRoom.connect(url, token);
+    console.log('[LiveKit] Connected successfully');
 
     // Add any existing participants (e.g. host already in room when guest joins)
     const existing = Array.from(livekitRoom.remoteParticipants.values());
     if (existing.length > 0) {
+      console.log('[LiveKit] Found', existing.length, 'existing participants');
       setRemoteParticipants(prev => {
         const fresh = existing.filter((ex) => !prev.some(p => p.identity === ex.identity));
         return [...prev, ...fresh];
@@ -175,8 +238,21 @@ export default function StudioRoomPage() {
     // Publish tracks to LiveKit for live preview (uses original stream)
     const audioTrack = stream.getAudioTracks()[0];
     const videoTrack = stream.getVideoTracks()[0];
-    if (audioTrack) await livekitRoom.localParticipant.publishTrack(audioTrack);
-    if (videoTrack) await livekitRoom.localParticipant.publishTrack(videoTrack);
+    
+    console.log('[LiveKit] Publishing tracks...', {
+      hasAudio: !!audioTrack,
+      hasVideo: !!videoTrack,
+      videoTrackId: videoTrack?.id,
+    });
+    
+    if (audioTrack) {
+      await livekitRoom.localParticipant.publishTrack(audioTrack);
+      console.log('[LiveKit] Audio track published');
+    }
+    if (videoTrack) {
+      await livekitRoom.localParticipant.publishTrack(videoTrack);
+      console.log('[LiveKit] Video track published');
+    }
 
     return livekitRoom;
   }, [slug]);
@@ -185,24 +261,29 @@ export default function StudioRoomPage() {
   const joinRoom = useCallback(async (displayName?: string) => {
     setIsJoining(true);
     setConnectError(null);
+    console.log('[Join] Starting join flow...');
 
     try {
       const info = await fetchToken(slug, displayName);
-      if (!info) throw new Error('Failed to get room token');
+      console.log('[Join] Got room token:', { identity: info.identity, isHost: info.isHost });
 
-      setIsAdmin(info.isAdmin);
+      setIsHost(info.isHost);
+      setRoomStatus(info.status as any);
       setLocalName(info.displayName);
 
       const stream = await setupLocalMedia();
+      console.log('[Join] Local media setup complete, connecting to room...');
+      
       const livekitRoom = await connectToRoom(info.token, info.url, stream);
 
       // Set room in state → triggers useSyncedRecording to re-subscribe
       setRoom(livekitRoom);
       setShowGreenRoom(false);
 
-      const role = info.isAdmin ? 'Host' : 'Guest';
-      console.log(`[LiveKit] Joined room as ${role} | name="${info.displayName}" room="${slug}"`);
+      const role = info.isHost ? 'Host' : 'Guest';
+      console.log(`[Join] Successfully joined room as ${role} | name="${info.displayName}" room="${slug}"`);
     } catch (err: any) {
+      console.error('[Join] Join failed:', err);
       setConnectError(err.message || 'Failed to join room');
     } finally {
       setIsJoining(false);
@@ -224,16 +305,28 @@ export default function StudioRoomPage() {
   }, []);
 
   const toggleMic = () => {
-    if (!localStream) return;
+    if (!localStream) {
+      console.warn('[ToggleMic] No local stream available');
+      return;
+    }
     const next = !isMicEnabled;
-    localStream.getAudioTracks().forEach(t => { t.enabled = next; });
+    localStream.getAudioTracks().forEach(t => { 
+      t.enabled = next;
+      console.log('[ToggleMic] Audio track enabled:', next, 'Track ID:', t.id);
+    });
     setIsMicEnabled(next);
   };
 
   const toggleCam = () => {
-    if (!localStream) return;
+    if (!localStream) {
+      console.warn('[ToggleCam] No local stream available');
+      return;
+    }
     const next = !isCamEnabled;
-    localStream.getVideoTracks().forEach(t => { t.enabled = next; });
+    localStream.getVideoTracks().forEach(t => { 
+      t.enabled = next;
+      console.log('[ToggleCam] Video track enabled:', next, 'Track ID:', t.id);
+    });
     setIsCamEnabled(next);
   };
 
@@ -262,9 +355,20 @@ export default function StudioRoomPage() {
           <span className="text-sm text-gray-400 font-mono">{slug}</span>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Syncing badge */}
-          {hasPendingChunks && !isRecording && (
+         <div className="flex items-center gap-3">
+           {/* Host Session Control */}
+           {isHost && roomStatus === 'WAITING' && (
+             <button
+               onClick={startSession}
+               className="flex items-center gap-2 text-sm px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all shadow-lg shadow-blue-500/20"
+             >
+               🚀 Start Session
+             </button>
+           )}
+
+           {/* Syncing badge */}
+           {hasPendingChunks && !isRecording && (
+
             <div className="flex items-center gap-2 text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 px-3 py-1.5 rounded-full">
               <Loader2 className="w-3 h-3 animate-spin" />
               Syncing...
@@ -304,17 +408,18 @@ export default function StudioRoomPage() {
           }`}
         >
           {/* Local (self) tile */}
-          <VideoTile
-            videoRef={localVideoRef}
-            stream={localStream}
-            name={localName || 'You'}
-            isHost={isAdmin}
-            isRecording={isRecording}
-            isSelf
-            isCamEnabled={isCamEnabled}
-            countdown={countdown}
-            muted
-          />
+           <VideoTile
+             videoRef={localVideoRef}
+             stream={localStream}
+             name={localName || 'You'}
+             isHost={isHost}
+             isRecording={isRecording}
+             isSelf
+             isCamEnabled={isCamEnabled}
+             countdown={countdown}
+             muted
+           />
+
 
           {/* Remote participant tiles */}
           {remoteParticipants.map((participant) => (
@@ -386,31 +491,34 @@ export default function StudioRoomPage() {
             {isCamEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
           </button>
 
-          {/* HOST ONLY — Recording button */}
-          {isAdmin && (
-            <button
-              onClick={() => (isRecording ? broadcastStop() : broadcastStart())}
-              disabled={countdown !== null}
-              className={`px-8 py-3 ml-4 rounded-full font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                isRecording
-                  ? 'bg-red-500 hover:bg-red-600 border border-red-400 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)]'
-                  : 'bg-[#00f0ff]/20 hover:bg-[#00f0ff]/30 text-[#00f0ff] border border-[#00f0ff]/50 shadow-[0_0_20px_rgba(0,240,255,0.2)]'
-              }`}
-            >
-              {countdown !== null
-                ? `Starting in ${countdown}...`
-                : isRecording
-                ? '⏹ Stop Recording'
-                : '⏺ Start Recording'}
-            </button>
-          )}
+           {/* HOST ONLY — Recording button */}
+            {isHost && (
+              <button
+                onClick={() => (isRecording ? broadcastStop() : handleStartRecording())}
+                disabled={countdown !== null}
+                className={`px-8 py-3 ml-4 rounded-full font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isRecording
+                    ? 'bg-red-500 hover:bg-red-600 border border-red-400 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)]'
+                    : 'bg-[#00f0ff]/20 hover:bg-[#00f0ff]/30 text-[#00f0ff] border border-[#00f0ff]/50 shadow-[0_0_20px_rgba(0,240,255,0.2)]'
+                }`}
+              >
+                {countdown !== null
+                  ? `Starting in ${countdown}...`
+                  : isRecording
+                  ? '⏹ Stop Recording'
+                  : '⏺ Start Recording'}
+              </button>
+            )}
 
-          {/* Guest: waiting hint */}
-          {!isAdmin && !isRecording && (
-            <p className="ml-4 text-xs text-gray-600 italic">
-              Waiting for host to start recording...
-            </p>
-          )}
+
+
+           {/* Guest: waiting hint */}
+           {!isHost && !isRecording && (
+             <p className="ml-4 text-xs text-gray-600 italic">
+               Waiting for host to start recording...
+             </p>
+           )}
+
         </div>
       )}
     </div>

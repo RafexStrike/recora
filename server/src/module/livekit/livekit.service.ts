@@ -10,13 +10,13 @@ export const LiveKitService = {
    * Generate a LiveKit JWT for a participant joining a room.
    * @param roomName  - The LiveKit room name (= studio slug)
    * @param identity  - A unique identifier for the participant
-   * @param isAdmin   - Whether the participant is the room host
+   * @param isHost    - Whether the participant is the room host
    * @param displayName - Human-readable name shown in the UI
    */
   async generateToken(
     roomName: string,
     identity: string,
-    isAdmin: boolean,
+    isHost: boolean,
     displayName: string
   ): Promise<string> {
     const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
@@ -30,11 +30,11 @@ export const LiveKitService = {
       room: roomName,
       canPublish: true,
       canSubscribe: true,
-      roomAdmin: isAdmin,
+      roomAdmin: isHost,
     });
 
     const token = await at.toJwt();
-    console.log(`[LiveKit] Token generated for identity="${identity}" room="${roomName}" isAdmin=${isAdmin}`);
+    console.log(`[LiveKit] Token generated for identity="${identity}" room="${roomName}" isHost=${isHost}`);
     return token;
   },
 

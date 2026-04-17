@@ -1,7 +1,7 @@
 // File: client/src/components/studio/VideoTile.tsx
 'use client';
 
-import { RefObject, useEffect } from 'react';
+import { RefObject, useEffect, useLayoutEffect } from 'react';
 import { VideoOff } from 'lucide-react';
 import { CountdownOverlay } from './CountdownOverlay';
 
@@ -29,14 +29,74 @@ export function VideoTile({
   muted = false,
 }: VideoTileProps) {
   
+  // Debug: log render
+  useEffect(() => {
+    console.log('[VideoTile] Rendered', { name, isSelf, hasStream: !!stream, isCamEnabled });
+    return () => {
+      console.log('[VideoTile] Unmounting', { name, isSelf });
+    };
+  }, [name, isSelf]);
+  
+  // Synchronous layout effect to attach stream before paint
+  useLayoutEffect(() => {
+    const video = videoRef?.current;
+    if (!video || !stream) {
+      if (!video) console.warn('[VideoTile] useLayoutEffect: Video element not ready', { name, isSelf });
+      return;
+    }
+    
+    // Verify video element is actually in the DOM
+    if (!document.body.contains(video)) {
+      console.warn('[VideoTile] useLayoutEffect: Video element not in DOM yet', { name, isSelf });
+      return;
+    }
+    
+    // Attach stream synchronously before browser paint
+    if (video.srcObject !== stream) {
+      console.log('[VideoTile] useLayoutEffect: Attaching stream synchronously', { 
+        name, 
+        isSelf,
+        videoElement: !!video,
+        videoElementInDOM: document.body.contains(video),
+        streamReady: !!stream && stream.getVideoTracks().length > 0,
+      });
+      video.srcObject = stream;
+    }
+  }, [stream, videoRef, name, isSelf]);
+  
   // Re-attach stream robustly in case React remounts the video element
   useEffect(() => {
-    if (videoRef && videoRef.current && stream) {
-      if (videoRef.current.srcObject !== stream) {
-        videoRef.current.srcObject = stream;
-      }
+    if (!videoRef?.current) {
+      console.log('[VideoTile] videoRef.current not available yet', { name, isSelf });
+      return;
     }
-  }, [stream, videoRef]);
+    
+    if (!stream) {
+      console.log('[VideoTile] Stream is null, clearing srcObject', { name, isSelf });
+      videoRef.current.srcObject = null;
+      return;
+    }
+    
+    console.log('[VideoTile] Attempting to attach stream', {
+      name,
+      isSelf,
+      currentSrcObject: !!videoRef.current.srcObject,
+      incomingStream: !!stream,
+      videoTracks: stream.getVideoTracks().length,
+      audioTracks: stream.getAudioTracks().length,
+    });
+    
+    // Always set srcObject, even if it's the same stream
+    // This ensures attachment after React re-renders
+    videoRef.current.srcObject = stream;
+    
+    console.log('[VideoTile] Stream attachment completed', {
+      name,
+      isSelf,
+      srcObjectNow: !!videoRef.current.srcObject,
+      isCorrectStream: videoRef.current.srcObject === stream,
+    });
+  }, [stream, videoRef, name, isSelf]);
 
   return (
     <div className="relative w-full aspect-video bg-[#0a0a0a] rounded-2xl overflow-hidden border border-white/10 shadow-xl">
@@ -46,6 +106,9 @@ export function VideoTile({
         playsInline
         muted={muted || isSelf}
         className={`w-full h-full object-cover ${isSelf ? 'scale-x-[-1]' : ''} transition-opacity duration-200 ${!isCamEnabled ? 'opacity-0' : 'opacity-100'}`}
+        onPlay={() => console.log('[VideoTile] Video playing:', { name, isSelf })}
+        onLoadedMetadata={() => console.log('[VideoTile] Metadata loaded:', { name, isSelf })}
+        onError={(e) => console.error('[VideoTile] Video error:', { name, isSelf, error: (e.target as any)?.error })}
       />
 
       {!isCamEnabled && (

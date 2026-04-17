@@ -8,15 +8,16 @@ interface LiveKitRoomInfo {
   url: string;
   identity: string;
   displayName: string;
-  isAdmin: boolean;
+  isHost: boolean;
   roomName: string;
+  status: string;
 }
 
 interface UseLiveKitRoomReturn {
   roomInfo: LiveKitRoomInfo | null;
   isLoading: boolean;
   error: string | null;
-  fetchToken: (slug: string, displayName?: string) => Promise<LiveKitRoomInfo | null>;
+  fetchToken: (slug: string, displayName?: string) => Promise<LiveKitRoomInfo>;
 }
 
 export function useLiveKitRoom(): UseLiveKitRoomReturn {
@@ -24,7 +25,7 @@ export function useLiveKitRoom(): UseLiveKitRoomReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchToken = useCallback(async (slug: string, displayName?: string): Promise<LiveKitRoomInfo | null> => {
+  const fetchToken = useCallback(async (slug: string, displayName?: string): Promise<LiveKitRoomInfo> => {
     setIsLoading(true);
     setError(null);
 
@@ -35,7 +36,7 @@ export function useLiveKitRoom(): UseLiveKitRoomReturn {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include', // send session cookie for host detection
-        body: JSON.stringify({ slug, displayName }),
+        body: JSON.stringify({ roomId: slug, displayName }),
       });
 
       if (!response.ok) {
@@ -46,14 +47,15 @@ export function useLiveKitRoom(): UseLiveKitRoomReturn {
       const data: LiveKitRoomInfo = await response.json();
       setRoomInfo(data);
 
-      const role = data.isAdmin ? 'Host' : 'Guest';
+      const role = data.isHost ? 'Host' : 'Guest';
       console.log(`[LiveKit] Joined room as ${role} | identity="${data.identity}" room="${data.roomName}"`);
 
       return data;
     } catch (err: any) {
-      setError(err.message || 'Unknown error');
+      const errorMessage = err.message || 'Unknown error';
+      setError(errorMessage);
       console.error('[LiveKit] Failed to fetch token:', err);
-      return null;
+      throw err;
     } finally {
       setIsLoading(false);
     }
